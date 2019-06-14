@@ -2,7 +2,7 @@ var express = require('express');
 var router = express.Router();
 const mariadb = require('mariadb');
 const bcrypt = require('bcrypt');
-const https = require('https')
+const https = require('https');
 const pool = mariadb.createPool({host: '127.0.0.1',port:'3306',user:'root',password:'123' ,connectionLimit: 2,database:'student'});
 /**qury excution*/
 async function qury(query,callback) {
@@ -85,10 +85,11 @@ router.post('/',  function(req, res) {
                 if (params.Status === "Success")
                 {
                     console.log(params.Status);
-                    var query = "INSERT INTO  `otp_verificatin` (`session`, `user_id`)"+ " VALUES "+ "('"+ params.Details +"',"+ instenceid.insertId+");";
+                    var query = "INSERT INTO  `otp_verificatin` (`session`, `user_id`, `mobileno`,)"+ " VALUES "+ "('"+ params.Details +"',"+ instenceid.insertId+",'"+ data.mobileno +"');";
+                    console.log(query)
                     qury(query,function (data) {
-                        data = {otpid:data.insertId }
-                        res.status(200).send(JSON.stringify(data))
+                        data = {otpid:data.insertId}
+                        res.status(200).send(data)
                     })
                 }
             })
@@ -137,4 +138,34 @@ function verifyOtp(otpid,otp,callback) {
 
 }
 })
-module.exports = router;
+
+function resendOtp(mobileno,callback){
+//otp count will be implemented
+    const options = {
+        hostname: '2factor.in',
+        path: '/API/V1/b59d586e-8ba3-11e9-ade6-0200cd936042/SMS/'+mobileno+'/AUTOGEN',
+        method: 'POST'
+    }
+    OtpAPI(options,function(params) {
+        console.log(params.Status);
+        if (params.Status === "Success")
+        {
+            console.log(params.Status);
+            var query = "Update `otp_verificatin` SET `session` = '"+params.Details +"'  where mobileno = '"+ mobileno+"' ;";
+            qury(query,function (data) {
+                var query = "SELECT * FROM `otp_verificatin` where mobileno = '"+ mobileno+"' ;";
+                qury(query,function (data) {
+                    console.log(data)
+                    data = {otpid:data[0].id};
+                    console.log(data);
+                    callback(data);
+                })
+            })
+        }
+    })
+}
+
+module.exports = {
+    router,
+    resendOtp
+};

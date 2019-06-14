@@ -1,7 +1,8 @@
 var express = require('express');
-var jwt = require('jsonwebtoken');
 const mariadb = require('mariadb');
+var jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+var register = require('./register.js');
 var router = express.Router();
 const pool = mariadb.createPool({host: '127.0.0.1',port:'3306',user:'root',password:'123' ,connectionLimit: 2,database:'student'});
 /**qury excution*/
@@ -21,24 +22,31 @@ async function qury(query,callback) {
 router.post('/', function(req, res, next) {
    var mobileno = req.body.mobileno
    var password = req.body.password
-    query = "SELECT password FROM `users` where mobileno ="+mobileno+";";
+    query = "SELECT * FROM `users` where mobileno ="+mobileno+";";
     qury(query,function (data) {
         console.log(data)
-        checkUser(password,data[0].password,function (data) {
+        checkUser(password,data[0].password,data[0],function (data) {
         res.send(data).status(data.status)
         })
 
     })
 });
-
 module.exports = router;
+async function checkUser(sentpassword, dbpasssword,data,callback) {
 
-async function checkUser(sentpassword, dbpasssword,callback) {
-    //... fetch user from a db etc.
     const match = await bcrypt.compare(sentpassword, dbpasssword);
     console.log(match)
     if (match) {
-        callback("password matched")
+        if (data.is_activte === 1){
+            var token = jwt.sign(data, 'password');
+            callback(token)
+        }
+        else {
+            register.resendOtp(data.mobileno,function (response) {
+                console.log(response)
+               callback(response)
+            })
+        }
     }
     else {
         data = {massage:"invalid Credential Username Or password iS wrong",status:403}
